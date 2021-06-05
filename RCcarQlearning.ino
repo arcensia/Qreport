@@ -376,7 +376,6 @@ void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
   delay(5000);//<-start
   go();
   int currentState = nowstates();
-  int newState;
 	//Perform tests, starting at all initial states.
   int newState = 0;
   newState = maximum(currentState, 1);//최선의 값

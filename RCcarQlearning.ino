@@ -1,4 +1,5 @@
 #include <Servo.h>
+
 /////////////핀번호 셋/////////////////
 const int SERVO = 2;
 
@@ -19,8 +20,7 @@ Servo myServo;
 #define qSize 9
 #define AAction 4
 const double mygamma = 0.8;
-const int iterations = 10;
-int initialStates[qSize] = {0, 1, 2, 3, 4, 5, 6, 7, 8};//<-상태를 항상 받는걸로 하자. 
+int initialStates[qSize] = {0, 1, 2, 3, 4, 5, 6, 7, 8};//<-상태를 항상 받는걸로 하자.
 // 0 장애물 감지x
 // 1 장애물 감지 후(기준점 30cm) -30 
 // 2 -20
@@ -43,6 +43,7 @@ int R[qSize][AAction] =  {{1, 1, 10, -3},
                   			};
 
 int Q[qSize][AAction];
+void initialize();
 void chooseAnAction(int shostate);
 int getRandomAction(int upperBound, int lowerBound, int gettState);
 float reward(int RcurrentState, int action);
@@ -54,46 +55,18 @@ int maximum(int state, int returnIndexOnly);
 void learn();
 int stoplearn();
 
-void setup(){
-  //pinset//
-  Serial.begin(9600);
-  myServo.attach(SERVO);
-  pinMode(LEN, OUTPUT);
-  pinMode(REN, OUTPUT);
-  pinMode(LMC1, OUTPUT);
-  pinMode(LMC2, OUTPUT);
-  pinMode(RMC1, OUTPUT);
-  pinMode(RMC2, OUTPUT);
-  pinMode(echoPin, INPUT);
-  pinMode(trigPin, OUTPUT);
-  brake(LMC1,LMC2, LEN);
-  brake(RMC1,RMC2, REN);  
-
-  //Qtable set//
-	initialize();
-  learn();
-  Serial.println("done");
-
-  //Print out Q matrix.
-  for(int i = 0; i < qSize; i++){
-    for(int j = 0; j < AAction; j++){
-      Serial.print(Q[i][j]);
-      if(j < qSize - 1){
-        Serial.print(",");
-      }
-    } // j
-      Serial.println();
-  } // i
-  Serial.println();
-}
 
 
 void learn(){
     int nowState = 0;
+    int learnstop = 0;
     do{
-      nowState = nowstates();
+      learnstop++;
+//      nowState = nowstates();
+      nowState = rand()%9;
       episode(nowState);
-    } while (stoplearn() != 1);//학습 종료지점
+//    } while (stoplearn() != 1);//학습 종료지점
+    }while(learnstop!=10000);
 }
 
 void forward (int MC1,int MC2, int EN){//전진함수
@@ -120,49 +93,49 @@ void brake (int MC1,int MC2, int EN){
 void go(){
   forward(LMC1,LMC2,LEN);
   forward(RMC1,RMC2,REN);
-  Serial.println("go");
+//  Serial.println("go");
 //  delay(dtime());
 }
 
 void back(){
   reverse(LMC1,LMC2,LEN);
   reverse(RMC1,RMC2,REN);
-  Serial.println("back");
+//  Serial.println("back");
 //  delay(dtime());
 }
 
 void leftturn(){
   brake(LMC1,LMC2, LEN);
   forward(RMC1,RMC2,REN);
-  Serial.println("left turn");
+//  Serial.println("left turn");
 //  delay(dtime());
 }
 
 void rightturn(){
   brake(RMC1,RMC2, REN);
   forward(LMC1,LMC2,LEN);
-  Serial.println("right turn");
+//  Serial.println("right turn");
 //  delay(dtime());
 }
 
 void qleftturn(){
   reverse(LMC1,LMC2,LEN);
   forward(RMC1,RMC2,REN);
-  Serial.println("qleft turn");
+//  Serial.println("qleft turn");
 //  delay(dtime());
 }
 
 void qrightturn(){
   forward(LMC1,LMC2,LEN);
   reverse(RMC1,RMC2,REN);
-  Serial.println("qright turn");
+//  Serial.println("qright turn");
 //  delay(dtime());
 }
 
 void bbrake(){
   brake(LMC1,LMC2, LEN);
   brake(RMC1,RMC2, REN);
-  Serial.println("brake");
+//  Serial.println("brake");
 //  delay(dtime());
 }
 
@@ -191,25 +164,12 @@ int readUlt(int pos){
   Serial.println(distance);
   return distance;
 }
-
-
-void checkUlt(float Ultcm){
-  if(Ultcm<=limcm()){
-    leftturn();//좌회전
-  }
-  else{
-    rightturn();//우회전
-  }
-}
-
-
-
 // int dtime(){// 행동에 대한 딜레이 타임
 //   return 500;
 // }
 
 int Carspeed(){//차 속도
-  return 50;
+  return 220;
 }
 int limcm(){//장애물 인식 거리
   return 30;
@@ -223,14 +183,17 @@ void episode(int initialState){//에피소드 진행
 void chooseAnAction(int shostate){//정해진 Action에 대해 1회씩 누적하여 Q값 쌓기
 	int possibleAction;
   possibleAction = getRandomAction(AAction, 0,shostate);//Action을 가져와
-  Q[shostate][possibleAction] = reward(shostate, possibleAction);//모두 적용
+  if(R[shostate][possibleAction]>=0){
+    Q[shostate][possibleAction] = reward(shostate, possibleAction);//모두 적용  
+  }
+  
 }
 
 int getRandomAction(int upperBound, int lowerBound, int gettState){//최대 - 최소//upperCound == qsize == 9, lowerBound == 0 // 1초당 진행 (1회씩 진행)
 	int action;
   action = lowerBound + rand() % AAction;
-  activateAction(action);//학습
-  //delay(100);
+//  activateAction(action);//학습
+  
   return action;
 }
 
@@ -283,11 +246,8 @@ int nowstates() {
 int obscheck(int need){
   int Fobs = 0, Lobs = 0, Robs = 0, Z = 0;
   Fobs = readUlt(90);//in servo pos;
-  delay(300);
   Robs = readUlt(60);//in servo pos;
-  delay(300);
   Lobs = readUlt(120);//in servo pos;
-  delay(300);
   myServo.write(90);
   
   Z = Lobs-Robs;
@@ -352,7 +312,7 @@ float reward(int RcurrentState,int action) {//축적된 R과, maximum에서의 �
 void initialize(){//Q테이블 초기화
 	//srand((unsigned)time(0));
     for(int i = 0; i < qSize; i++){ // <- State
-        for(int j = 0; j <qSize; j++){// <- Action
+        for(int j = 0; j <AAction; j++){// <- Action
             Q[i][j] = 0;
 		} // j
 	} // i
@@ -362,7 +322,7 @@ int stoplearn() {
     int stop=0;
     for (int i = 0; i < 9; i++) {
         for (int j = 0; j < 4; j++) {
-            if (Q[i][j] > 40)
+            if (Q[i][j] > 10)
             {
                 stop = 1;
                 return stop;
@@ -371,10 +331,41 @@ int stoplearn() {
     } // i
 }
 
+
+void setup(){
+  //pinset//
+  Serial.begin(9600);
+  myServo.attach(SERVO);
+  pinMode(LEN, OUTPUT);
+  pinMode(REN, OUTPUT);
+  pinMode(LMC1, OUTPUT);
+  pinMode(LMC2, OUTPUT);
+  pinMode(RMC1, OUTPUT);
+  pinMode(RMC2, OUTPUT);
+  pinMode(echoPin, INPUT);
+  pinMode(trigPin, OUTPUT);
+  brake(LMC1,LMC2, LEN);
+  brake(RMC1,RMC2, REN);  
+
+  //Qtable set//
+  initialize();
+  learn();
+  Serial.println("done");
+  //Print out Q matrix.
+  for(int i = 0; i < qSize; i++){
+    for(int j = 0; j < AAction; j++){
+      Serial.print(Q[i][j]);
+      if(j < qSize - 1){
+        Serial.print(",");
+      }
+    } // j
+      Serial.println();
+  } // i
+  Serial.println();
+}
+
 void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
-  bbrake();
-  delay(5000);//<-start
-  go();
+  
   int currentState = nowstates();
 	//Perform tests, starting at all initial states.
   int newState = 0;
@@ -384,6 +375,6 @@ void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
   activateAction(currentState); // <- 동작
   // delay(1000);
   // Serial.println("");
+  
+  bbrake();
 }
-
-

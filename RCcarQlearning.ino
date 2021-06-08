@@ -42,7 +42,7 @@ int R[qSize][AAction] =  {{1, 1, 10, -3},
                   			{-1, -1, -10, 3}
                   			};
 
-int Q[qSize][AAction];
+float Q[qSize][AAction];
 void initialize();
 void chooseAnAction(int shostate);
 int getRandomAction(int upperBound, int lowerBound, int gettState);
@@ -186,7 +186,6 @@ void chooseAnAction(int shostate){//정해진 Action에 대해 1회씩 누적하
   if(R[shostate][possibleAction]>=0){
     Q[shostate][possibleAction] = reward(shostate, possibleAction);//모두 적용  
   }
-  
 }
 
 int getRandomAction(int upperBound, int lowerBound, int gettState){//최대 - 최소//upperCound == qsize == 9, lowerBound == 0 // 1초당 진행 (1회씩 진행)
@@ -197,16 +196,6 @@ int getRandomAction(int upperBound, int lowerBound, int gettState){//최대 - �
   return action;
 }
 
-// States
-// 0 장애물 감지x
-// 1 장애물 감지 후(기준점 30cm) -30 미만
-// 2 -30~-20
-// 3 -20~-10
-// 4 -10~10
-// 5  10~20
-// 6  20~30
-// 7  30 초과
-// 8 장애물과의 거리(10cm이하)
 int nowstates() {
   int Fobstacle, Zobs, numstate;
   Fobstacle = obscheck(0);
@@ -365,16 +354,26 @@ void setup(){
 }
 
 void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
-  
-  int currentState = nowstates();
-	//Perform tests, starting at all initial states.
+  int check = 0;
+  int currentState = 0;
   int newState = 0;
-  newState = maximum(currentState, 1);//최선의 값
-  // Serial.print(currentState);
-  currentState = newState;
-  activateAction(currentState); // <- 동작
-  // delay(1000);
-  // Serial.println("");
-  
-  bbrake();
+  check = readUlt(90);
+  if(check<40||check>990){
+    if(check<20){
+      bbrake();
+    }
+    delay(1000);
+    currentState = nowstates();
+    //Perform tests, starting at all initial states.
+    newState = 0;
+    newState = maximum(currentState, 1);//최선의 값
+    // Serial.print(currentState);
+    currentState = newState;
+    activateAction(currentState); // <- 동작
+//    delay(1000);
+    // Serial.println(""); 
+  }
+  else(){
+    forward();
+  }
 }

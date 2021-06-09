@@ -1,5 +1,5 @@
 #include <Servo.h>
-
+#include<stdlib.h>
 /////////////핀번호 셋/////////////////
 const int SERVO = 2;
 
@@ -19,7 +19,7 @@ Servo myServo;
 //////////////Q러닝////////////////////
 #define qSize 9
 #define AAction 4
-const double mygamma = 0.8;
+const double mygamma = 0.9;
 int initialStates[qSize] = {0, 1, 2, 3, 4, 5, 6, 7, 8};//<-상태를 항상 받는걸로 하자.
 // 0 장애물 감지x
 // 1 장애물 감지 후(기준점 30cm) -30 
@@ -31,16 +31,15 @@ int initialStates[qSize] = {0, 1, 2, 3, 4, 5, 6, 7, 8};//<-상태를 항상 받�
 // 7  30
 // 8 장애물과의 거리(10cm이하)
 // Action 0. 좌회전, 1. 우회전, 2. 전진, 3. 후진
-int R[qSize][AAction] =  {{1, 1, 10, -3},
-                  			{-3, 3, -3, 0},
-                  			{-2, 2, -3, 0},
-                  			{-1, 1, -3, 0},
-                  			{1, 1, -3, 0},
-                  			{1, -1, -3, 0},
-                  			{2, -2, -3, 0},
-                  			{3, -3, -3, 0},
-                  			{-1, -1, -10, 3}
-                  			};
+int R[9][4] = { {1, 1, 2, -2},
+               {-2, 2, -1, 1},
+               {-2, 2, -1, 1},
+               {-2, 2, -1, 1},
+               {1, 1, -2, -1},
+               {2, -1, -1, 1},
+               {2, -2, -1, 1},
+               {2, -2, -1, 1},
+               {-1, -1, -2, 2} };
 
 float Q[qSize][AAction];
 void initialize();
@@ -62,11 +61,12 @@ void learn(){
     int learnstop = 0;
     do{
       learnstop++;
-//      nowState = nowstates();
+//     nowState = nowstates();
       nowState = rand()%9;
+      Serial.println(nowState);
       episode(nowState);
 //    } while (stoplearn() != 1);//학습 종료지점
-    }while(learnstop!=10000);
+    }while(learnstop<=100);
 }
 
 void forward (int MC1,int MC2, int EN){//전진함수
@@ -105,15 +105,15 @@ void back(){
 }
 
 void leftturn(){
-  brake(LMC1,LMC2, LEN);
+  brake(LMC1,LMC2,LEN);
   forward(RMC1,RMC2,REN);
 //  Serial.println("left turn");
 //  delay(dtime());
 }
 
 void rightturn(){
-  brake(RMC1,RMC2, REN);
   forward(LMC1,LMC2,LEN);
+  brake(RMC1,RMC2,REN);
 //  Serial.println("right turn");
 //  delay(dtime());
 }
@@ -133,8 +133,14 @@ void qrightturn(){
 }
 
 void bbrake(){
-  brake(LMC1,LMC2, LEN);
-  brake(RMC1,RMC2, REN);
+  digitalWrite(LEN, LOW);
+  digitalWrite(LMC1, LOW);
+  digitalWrite(LMC2, LOW);
+  digitalWrite(LEN,LOW);
+  digitalWrite(REN, LOW);
+  digitalWrite(RMC1, LOW);
+  digitalWrite(RMC2, LOW);
+  digitalWrite(REN,LOW);
 //  Serial.println("brake");
 //  delay(dtime());
 }
@@ -152,7 +158,7 @@ void checkServo(){
 int readUlt(int pos){
   long duration, distance;
   myServo.write(pos);//서브모터 방향 회전
-  delay(200);
+  delay(400);
   digitalWrite(trigPin, LOW);
   delayMicroseconds(2);
   digitalWrite(trigPin, HIGH);
@@ -164,12 +170,13 @@ int readUlt(int pos){
   Serial.println(distance);
   return distance;
 }
+
 // int dtime(){// 행동에 대한 딜레이 타임
 //   return 500;
 // }
 
 int Carspeed(){//차 속도
-  return 220;
+  return 200;
 }
 int limcm(){//장애물 인식 거리
   return 30;
@@ -191,45 +198,10 @@ void chooseAnAction(int shostate){//정해진 Action에 대해 1회씩 누적하
 int getRandomAction(int upperBound, int lowerBound, int gettState){//최대 - 최소//upperCound == qsize == 9, lowerBound == 0 // 1초당 진행 (1회씩 진행)
 	int action;
   action = lowerBound + rand() % AAction;
-//  activateAction(action);//학습
-  
+  //activateAction(action);//학습
+//  delay(500);
+  bbrake();
   return action;
-}
-
-int nowstates() {
-  int Fobstacle, Zobs, numstate;
-  Fobstacle = obscheck(0);
-  Zobs = obscheck(1);
-    if (Fobstacle < 10) {
-        numstate = 8;
-    }
-    else if (Fobstacle > 30) {
-        numstate = 0;
-    }
-    else {
-        if (Zobs > -30) {
-            numstate = 2;
-            if (Zobs >= -20) {
-                numstate = 3;
-                if (Zobs >= -10) {
-                    numstate = 4;
-                    if (Zobs >= 10) {
-                        numstate = 5;
-                        if (Zobs >= 20) {
-                            numstate = 6;
-                            if (Zobs >= 30) {
-                                numstate = 7;
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        else {
-            numstate = 1;
-        }
-    }
-    return numstate;
 }
 
 int obscheck(int need){
@@ -338,6 +310,7 @@ void setup(){
 
   //Qtable set//
   initialize();
+  delay(1000);
   learn();
   Serial.println("done");
   //Print out Q matrix.
@@ -358,11 +331,12 @@ void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
   int currentState = 0;
   int newState = 0;
   check = readUlt(90);
-  if(check<40||check>990){
-    if(check<20){
+  if(check<40){
+    if(check<20||check>990){
       bbrake();
+      delay(500);
     }
-    delay(1000);
+    delay(500);
     currentState = nowstates();
     //Perform tests, starting at all initial states.
     newState = 0;
@@ -370,10 +344,46 @@ void loop(){ //학습 완료된 maximum에 따른 최종값을 실행
     // Serial.print(currentState);
     currentState = newState;
     activateAction(currentState); // <- 동작
-//    delay(1000);
-    // Serial.println(""); 
+    delay(500);
   }
-  else(){
-    forward();
+  else{
+    go();
   }
+}
+
+
+int nowstates() {
+  int Fobstacle, Zobs, numstate;
+  Fobstacle = obscheck(0);
+  Zobs = obscheck(1);
+    if (Fobstacle < 10) {
+        numstate = 8;
+    }
+    else if (Fobstacle > 30) {
+        numstate = 0;
+    }
+    else {
+        if (Zobs > -30) {
+            numstate = 2;
+            if (Zobs >= -20) {
+                numstate = 3;
+                if (Zobs >= -10) {
+                    numstate = 4;
+                    if (Zobs >= 10) {
+                        numstate = 5;
+                        if (Zobs >= 20) {
+                            numstate = 6;
+                            if (Zobs >= 30) {
+                                numstate = 7;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        else {
+            numstate = 1;
+        }
+    }
+    return numstate;
 }
